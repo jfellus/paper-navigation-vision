@@ -14,6 +14,6 @@ make
     * *data/N* : Number of frames captured
     * *data/images* : Captured frames
     * *data/trajectory* : Trajectory informations from the robot (odometry, motor commands, ...)
-* *build/* : Builded algorithms executables go here
+* *build/* : Built executables (one per navigation algorithm) go here
 * *bin/* : Intermediary build files go here
 
