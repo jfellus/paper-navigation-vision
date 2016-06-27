@@ -1,0 +1,241 @@
+
+
+<html>
+<head>
+<title>Navigation</title>
+<style>
+	* { font-family:"Lucida Sans Unicode", "Lucida Grande", sans-serif;
+	-webkit-user-select: none; /* Chrome/Safari */
+	-moz-user-select: none; /* Firefox */
+	-ms-user-select: none; /* IE10+ */
+		-o-user-select: none;
+		user-select: none;
+	}
+	* { padding:0; margin:0;}
+	#camera {
+		width:100%; height:100%;
+	}
+	body > table {width:100%; height:100%; background: #eeeeee;}
+	#timeline {
+		background: #eeeeee;
+		width:100%;height:100%;
+		cursor:hand;
+	}
+	#timeline > span {
+		padding-top:3px;
+		background: #aaaaff;
+		border-right:1px solid #aaaaaa;
+		display:block;
+		width:1%;height:100%;
+		pointer-events: none;
+		text-align:right;
+	}
+	td {position:relative;}
+	#head { position:absolute; padding:10px;color:white; background:rgba(0,0,0,0.6);}
+	img { background: black; border:1px solid #444444; margin:5px; box-sizing: border-box;}
+	#data { padding:15px;}
+	.bar { background:red; border:1px solid black; position:relative; display:inline-block;
+		padding:0; margin:0; box-sizing: border-box;
+	}
+	.bar > span { position:absolute; bottom:20px; text-align:center; left:0; width:100%; height:auto;
+		display:block;
+		font-size:8px;
+		transform: rotateZ(90deg);
+		padding:0; box-sizing: border-box;
+	}
+	#results {
+		width:100%;
+		border:1px solid black;
+		background:white;
+		height:30vh;
+		display:flex;
+		flex-direction: row;
+		align-items: flex-end;
+		align-content: stretch;
+	}
+	#right {
+		display:flex;
+		width:100%; height:100%;
+		flex-direction: column;
+		justify-content: flex-start;
+		align-items: stretch;
+	}
+	#map {
+		background:white;
+	}
+	#trajectory {
+		stroke-width:3px;
+		stroke:blue;
+		fill:none;
+	}
+
+	.live img {
+		border:5px solid red;
+	}
+	.live #timeline {
+		background:red;
+	}
+
+</style>
+</head>
+<body><table><tr><td width=50%>
+	<span id="head"></span>
+	<img id="camera"></img>
+</td>
+<td id="data">
+	<div id="right">
+	<div id="results"></div>
+	<svg id="map" width="100%" height="50%">
+		<circle id="robot" r="5" fill="black"></circle>
+		<path id="trajectory" d=""></path>
+	</svg>
+	</div>
+</td></tr>
+<tr><td height="20px" colspan=2>
+	<div id="timeline" onclick="settime();" onmousemove='settime();'><span></span></div>
+</td></tr>
+</body>
+
+<script>
+
+var LIVE = true;
+var T = 0;
+var N = 1000;
+var RESULTS = [];
+var RESET_TRAJECTORY = false;
+
+function HEADER() {
+	return (LIVE ? "LIVE" : "RECORDED") + " - N=" + N + ", t="+T;
+}
+
+function settime() {
+	if(event.which === 1) {
+		LIVE = false;
+		T = parseInt(event.x/event.target.offsetWidth*N);
+		ontime(T);
+	}
+}
+
+function tic() {
+	T++;
+	if(T>=N) T = 0;
+	ontime(T);
+}
+function next() { tic(); }
+function prev() {
+	T--;
+	if(T<0) T = N-1;
+	ontime(T);
+}
+
+function ontime(t) {
+	if(LIVE) document.body.className = "live";
+	else document.body.className = "";
+
+	$("#timeline > span").style.width = (t/N*100) + "%";
+	$("#timeline > span").innerHTML = t;
+	$("#head").innerHTML = HEADER();
+
+	if(LIVE) $("#camera").src = "data/image.jpg?q=" + (new Date().getTime());
+	else $("#camera").src = "data/images/" + t.zeroPad(8) + ".jpg?q=" + (new Date().getTime());
+
+	if(!RESULTS[t]) $("#results").innerHTML = "no data";
+	else $("#results").innerHTML = plot(RESULTS[t]);
+
+	if(!TRAJECTORY[t]) {}
+	else {
+		var x = TRAJECTORY[t][0];
+		var y = TRAJECTORY[t][1];
+		$("#robot").setAttribute("cx", x);
+		$("#robot").setAttribute("cy", y);
+
+		if(RESET_TRAJECTORY || !$("#trajectory").getAttribute('d')) $("#trajectory").setAttribute('d', "M"+x + " " + y);
+		$("#trajectory").setAttribute('d',
+			$("#trajectory").getAttribute("d") + " L" + x + " " + y
+		);
+		RESET_TRAJECTORY = false;
+	}
+}
+
+
+function plot(tab, max) {
+	if(!max) max = 65535;
+	return tab.map(function(x) {
+		return "<div class='bar' style='width:"+(100/tab.length)+"%;height:"+(parseFloat(x)/max*100)+"%;'><span>"+x+"</span></div>";
+	}).join("\n");
+}
+
+//////////
+// MAIN //
+//////////
+
+get("data/N", function(x){
+	N = parseInt(x);
+	get("data/results.txt", function(x){
+		RESULTS = x.split("\n").map(function(l) {
+			return l.split(" ").map(function(z) {
+				return parseFloat(z);
+			});
+		});
+	});
+	get("data/trajectory.txt", function(x){
+		TRAJECTORY = x.split("\n").map(function(l) {
+			return l.split(" ").map(function(z) {
+				return parseFloat(z);
+			});
+		});
+	})
+});
+
+var _interval = null;
+document.onkeydown = function() {
+	if(event.keyCode === 32) {
+		if(_interval) { clearInterval(_interval); _interval = null;}
+		else _interval = setInterval(tic, 100);
+	} else if(event.keyCode === 39) {next();}
+	else if(event.keyCode === 37) {prev();}
+	else if(event.keyCode === 82 /* R */) {
+		RESET_TRAJECTORY = true;
+	}
+	else if(event.keyCode === 76 /* L */) {
+		LIVE = !LIVE;
+	}
+	else {
+		console.log(event.keyCode);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////// UTILS ///////////////////////////
+
+function $(x) { return document.querySelector(x); }
+
+function get(what, callback) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (xhttp.readyState == 4 && xhttp.status == 200) {
+      callback(xhttp.responseText);
+    }
+  };
+  xhttp.open("GET", what, true);
+  xhttp.send();
+}
+
+Number.prototype.zeroPad = Number.prototype.zeroPad ||
+ function(base){
+   var nr = this, len = (base - String(nr).length)+1;
+   return len > 0? new Array(len).join('0')+nr : nr;
+};
+
+</script>
+</html>
