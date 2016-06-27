@@ -6,6 +6,14 @@ just type
 make
 ````
 
+# Use the web interface
+
+type
+````bash
+./serve.sh
+````
+and open a browser to your IP at port 8888
+
 # Structure
 
 * *src/* : Sources for the executables (you should only modify src/algos...)
